@@ -1,0 +1,309 @@
+1. CREATE DATABASE schoolDB;
+
+   CREATE USER 't1'@'localhost' IDENTIFIED BY '250297';
+
+   CREATE USER 't2'@'localhost' IDENTIFIED BY 'Alamakota';
+
+   CREATE USER 'r1'@'localhost' IDENTIFIED BY 'Kotmaale';
+
+   CREATE USER 's'@'localhost' IDENTIFIED BY 'zielonykajak';
+
+   CREATE USER 'd'@'localhost' IDENTIFIED BY 'czerwonykajak';
+
+   GRANT SELECT ON schoolDB.* TO 't1'@'localhost';
+
+   GRANT SELECT ON schoolDB.* TO 'r1'@'localhost';
+
+   GRANT SELECT ON schoolDB.* TO 's'@'localhost';
+
+   GRANT SELECT, INSERT, UPDATE, DELETE ON schoolDB.* TO 's'@'localhost';
+	
+   GRANT INSERT, UPDATE, DELETE ON schoolDB.praises TO 't1'@'localhost';
+
+   GRANT INSERT, UPDATE, DELETE ON schoolDB.reprimands TO 't1'@'localhost';
+
+   GRANT INSERT, UPDATE, DELETE ON schoolDB.grades TO 't1'@'localhost';
+
+   FLUSH PRIVILEGES;
+
+   CREATE TABLE teachers (id INT NOT NULL AUTO_INCREMENT, name VARCHAR(14) NOT NULL, surname VARCHAR(30) NOT NULL, phone_number INT NOT NULL, PRIMARY KEY (id));
+
+   CREATE TABLE students (pesel BIGINT(11) ZEROFILL NOT NULL, name VARCHAR(14) NOT NULL, second_name VARCHAR(14), surname VARCHAR(30) NOT NULL, dateofbirthday DATE NOT NULL, residence_address VARCHAR(30) NOT NULL, zip_code VARCHAR(6) NOT NULL, address VARCHAR(30) NOT NULL, class VARCHAR(5) NOT NULL, father_name VARCHAR(20), mother_name VARCHAR(20), id_parents INT NOT NULL, PRIMARY KEY (pesel));
+
+   CREATE TABLE parents (id INT NOT NULL AUTO_INCREMENT, phone_number INT NOT NULL, PRIMARY KEY (id));
+
+   CREATE TABLE classes (name VARCHAR(5) NOT NULL , id_educator INT NOT NULL, number_students INT NOT NULL, PRIMARY KEY (name));
+
+   CREATE TABLE subjects (name VARCHAR(20) NOT NULL, class VARCHAR(5) NOT NULL, id_teacher INT NOT NULL);
+
+   CREATE TABLE grades (id INT NOT NULL AUTO_INCREMENT, grade INT NOT NULL, subject VARCHAR(30) NOT NULL, date DATE NOT NULL, id_student BIGINT(11) ZEROFILL NOT NULL, description VARCHAR(30) NOT NULL, PRIMARY KEY (id));
+
+   CREATE TABLE reprimands (id INT NOT NULL AUTO_INCREMENT, id_student BIGINT(11) ZEROFILL NOT NULL, description VARCHAR(50), date DATE NOT NULL, id_teacher, PRIMARY KEY (id));
+
+   CREATE TABLE praises (id INT NOT NULL AUTO_INCREMENT, id_student BIGINT(11) ZEROFILL NOT NULL, description VARCHAR(50), date DATE NOT NULL, id_teacher INT, PRIMARY KEY (id));
+
+ALTER TABLE reprimands ADD FOREIGN KEY (id_teacher)REFERENCES teachers(id);
+f
+ALTER TABLE praises ADD FOREIGN KEY (id_teacher)REFERENCES teachers(id);
+
+ALTER TABLE reprimands ADD FOREIGN KEY (id_student)REFERENCES students(pesel) ON UPDATE CASCADE;
+
+ALTER TABLE praises ADD FOREIGN KEY (id_student)REFERENCES students(pesel) ON UPDATE CASCADE;
+
+ALTER TABLE grades ADD FOREIGN KEY (id_student)REFERENCES students(pesel) ON UPDATE CASCADE;
+
+ALTER TABLE students ADD FOREIGN KEY (id_parents)REFERENCES parents(id);
+
+ALTER TABLE students ADD FOREIGN KEY (class)REFERENCES classes(name);
+
+ALTER TABLE subjects ADD FOREIGN KEY (id_teacher)REFERENCES teachers(id);
+
+ALTER TABLE subjects ADD FOREIGN KEY (class)REFERENCES classes(name);
+
+ALTER TABLE classes ADD FOREIGN KEY (id_educator)REFERENCES teachers(id);
+
+
+INSERT INTO teachers SET name = 'Bartłomiej', surname = 'Kowalewski', phone_number = '263827334'; 	  
+
+INSERT INTO classes SET name = 'IVc', id_educator = (SELECT id FROM teachers ORDER BY RAND() LIMIT 1), number_students = (SELECT COUNT(class) FROM students WHERE class = 'IVc' GROUP BY class);
+
+INSERT INTO subjects SET name = 'fizyka', class = 'IIa', id_teacher = 1;
+
+DELIMITER $$
+CREATE FUNCTION random_words()
+RETURNS varchar(20) DETERMINISTIC
+BEGIN
+DECLARE i INT DEFAULT 0;
+DECLARE k INT DEFAULT 0;
+DECLARE counter INT DEFAULT 0;
+DECLARE alphabet varchar(26) DEFAULT '';
+DECLARE word varchar(20) DEFAULT '';
+SET alphabet = 'abcdefghijklmnopqrstuvwxyz';
+SET i = floor(rand()*7+3);
+WHILE counter < i DO
+SET k = floor(rand()*26+1);
+SET word = CONCAT(word, SUBSTR( alphabet, k, 1));
+SET counter = counter + 1;
+END WHILE;
+RETURN word;
+END
+$$
+
+DELIMITER $$
+CREATE PROCEDURE random_records (nazwa varchar(20), num int)
+BEGIN
+DECLARE i int DEFAULT 0;
+DECLARE k bigint;
+DECLARE word varchar(4) DEFAULT '';
+CASE nazwa
+
+WHEN 'students' THEN
+WHILE i < num DO
+
+SET k = FLOOR(RAND()*4+1);
+IF k = 1 THEN SET word = 'I';
+ELSEIF k = 2 THEN SET word = 'II';
+ELSEIF k = 3 THEN SET word = 'III';
+ELSE SET word = 'IV';
+END IF;
+
+SET k = FLOOR(RAND()*3+1);
+IF k = 1 THEN SET word = CONCAT(word, 'a');
+ELSEIF k = 2 THEN SET word = CONCAT(word, 'b');
+ELSE SET word = CONCAT(word, 'c');
+END IF;
+
+SET k = FLOOR(RAND()*4+1);
+IF k = 1 THEN SET k = 01;
+ELSEIF k = 2 THEN SET k = 02;
+ELSEIF k = 3 THEN SET k = 03;
+ELSE SET k = 04;
+END IF;
+SET k = k * 100;
+SET k = k + FLOOR(RAND()*12 + 21);
+SET k = k * 100 + FLOOR(RAND()*30 + 1);
+SET k = k * 100000;
+
+INSERT INTO students SET pesel = k + FLOOR(RAND()*100000), name = random_words(), second_name = random_words(), surname = random_words(), dateofbirthday = FROM_DAYS(TO_DAYS(CURRENT_DATE) - 19*365 + ROUND(RAND()*1461)), residence_address = random_words(), zip_code = CONCAT(FLOOR(RAND()*90 + 10), '-', FLOOR(RAND()*900 + 100)), address = CONCAT(random_words(), ' ', FLOOR(RAND()*99 + 1)), class = word, father_name = random_words(), mother_name = random_words(), id_parents = (SELECT id FROM parents ORDER BY RAND() LIMIT 1);
+SET i = i + 1;
+END WHILE;
+
+WHEN 'parents' THEN
+WHILE i < num DO
+INSERT INTO parents SET phone_number = FLOOR(RAND()*900000000 + 100000000);
+SET i = i + 1;
+END WHILE;
+
+WHEN 'grades' THEN
+WHILE i < num DO
+INSERT INTO grades SET grade = FLOOR(RAND()*6 + 1), subject = (SELECT name FROM subjects ORDER BY RAND() LIMIT 1), date = FROM_DAYS(TO_DAYS(CURRENT_DATE) - 120 + ROUND(RAND()*120)), id_student = (SELECT pesel FROM students ORDER BY RAND() LIMIT 1), description = random_words();
+SET i = i + 1;
+END WHILE;
+
+WHEN 'reprimands' THEN
+WHILE i < num DO
+INSERT INTO reprimands SET id_student = (SELECT pesel FROM students ORDER BY RAND() LIMIT 1), description = random_words(), date = FROM_DAYS(TO_DAYS(CURRENT_DATE) - 120 + ROUND(RAND()*120)), id_teacher = (SELECT id FROM teachers ORDER BY RAND() LIMIT 1);
+SET i = i + 1;
+END WHILE;
+
+WHEN 'praises' THEN
+WHILE i < num DO
+INSERT INTO praises SET id_student = (SELECT pesel FROM students ORDER BY RAND() LIMIT 1), description = random_words(), date = FROM_DAYS(TO_DAYS(CURRENT_DATE) - 120 + ROUND(RAND()*120)), id_teacher = (SELECT id FROM teachers ORDER BY RAND() LIMIT 1);
+SET i = i + 1;
+END WHILE;
+
+END CASE;
+END
+$$
+DELIMITER ;
+
+
+TRIGGERY
+
+DELIMITER $$
+CREATE TRIGGER insert_student BEFORE INSERT ON students FOR EACH ROW
+BEGIN
+IF TIMESTAMPDIFF(YEAR, NEW.dateofbirthday, CURDATE()) < 13 OR TIMESTAMPDIFF(YEAR, NEW.dateofbirthday, CURDATE()) > 21 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Wiek osoby nie mieści się w dozwolonym zakresie!';
+ELSEIF new.pesel < 1210100000 OR new.pesel >= 100000000000 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Podano nieprawidłowy pesel!';
+ELSEIF new.zip_code NOT LIKE '__-___' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Podano nieprawidłowy format kodu pocztowego!';
+END IF;
+END;
+$$
+DELIMITER ;
+
+DELIMITER $$
+CREATE TRIGGER delete_studentB BEFORE DELETE ON students FOR EACH ROW
+BEGIN
+DELETE FROM reprimands WHERE old.pesel = id_student;
+DELETE FROM praises WHERE old.pesel = id_student;
+DELETE FROM grades WHERE old.pesel = id_student;
+END;
+$$
+DELIMITER ;
+
+DELIMITER $$
+CREATE TRIGGER delete_studentA AFTER DELETE ON students FOR EACH ROW
+BEGIN
+DELETE FROM parents WHERE id NOT IN (SELECT id_parents FROM students);
+UPDATE classes SET number_students = number_students - 1 WHERE name = old.class;
+END;
+$$
+DELIMITER ;
+
+DELIMITER $$
+CREATE TRIGGER add_studentA AFTER INSERT ON students FOR EACH ROW
+BEGIN
+UPDATE classes SET number_students = number_students + 1 WHERE name = new.class;
+END;
+$$
+DELIMITER ;
+
+DELIMITER $$
+CREATE TRIGGER change_class AFTER UPDATE ON classes FOR EACH ROW
+BEGIN
+UPDATE students SET class = NEW.name WHERE class = OLD.name;
+END;
+$$
+DELIMITER ;
+
+DELIMITER $$
+CREATE TRIGGER change_class_student AFTER UPDATE ON students FOR EACH ROW
+BEGIN
+UPDATE classes SET number_students = (SELECT COUNT(pesel) FROM students WHERE class = old.class) WHERE name = old.class;
+UPDATE classes SET number_students = (SELECT COUNT(pesel) FROM students WHERE class = new.class) WHERE name = new.class;
+END;
+$$
+DELIMITER ;
+
+DELIMITER $$
+CREATE TRIGGER change_grade BEFORE UPDATE ON grades FOR EACH ROW
+BEGIN
+IF NEW.grade > 6 OR NEW.grade < 1 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Ocena nie mieści się w dozwolonym zakresie!';
+END IF;
+END;
+$$
+DELIMITER ;
+
+DELIMITER $$
+CREATE TRIGGER change_phone BEFORE UPDATE ON teachers FOR EACH ROW
+BEGIN
+IF NEW.phone_number > 999999999 OR NEW.phone_number < 100000000 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Numer osoby nie mieści się w dozwolonym zakresie!';
+END IF;
+END;
+$$
+DELIMITER ;
+
+DELETE FROM students WHERE pesel = ?;
+
+01252019735
+
+209603615
+
+DELIMITER $$
+CREATE PROCEDURE endschoolyear()
+BEGIN
+DELETE FROM students WHERE class LIKE 'IV%' AND (SELECT AVG(average) FROM (SELECT AVG(grade) AS average FROM grades WHERE id_student = pesel GROUP BY subject) AS tab) >= 2 AND NOT EXISTS (SELECT AVG(grade) AS average FROM grades WHERE id_student = pesel GROUP BY subject HAVING average < 2);
+
+
+
+
+
+////////////////////////////////
+
+
+DELIMITER $$
+CREATE PROCEDURE endschoolyear()
+BEGIN
+	DECLARE classTemp1 VARCHAR(3);
+	DECLARE classTemp3 VARCHAR(1) DEFAULT "a";
+	DROP TEMPORARY TABLE IF EXISTS tempTable1, tempTable2, gradesTemptable;
+	CREATE TEMPORARY TABLE tempTable1 (classes varchar(3));
+	CREATE TEMPORARY TABLE tempTable2 (classes varchar(3));	
+	CREATE TEMPORARY TABLE gradesTemptable AS (SELECT DISTINCT id_student FROM grades GROUP BY id_student, subject HAVING AVG(grade) < 2);
+	SET @classTemp2 = "IV";
+	SET @done = 0;
+	INSERT INTO tempTable1 VALUES ("III"), ("II"), ("I");
+	INSERT INTO tempTable2 VALUES ("a"), ("b"), ("c"), ("d");
+	DELETE FROM students WHERE class LIKE 'IV%' AND NOT EXISTS (SELECT * FROM gradesTemptable WHERE id_student = pesel);
+	DELETE FROM praises;
+	DELETE FROM reprimands;
+	DELETE FROM grades;
+	DELETE FROM subjects WHERE class LIKE 'IV%';
+	DELETE FROM subjects WHERE name IN ("chemia", "biologia", "geografia", "historia") AND class = "Ia";
+	DELETE FROM subjects WHERE name IN ("chemia", "biologia", "geografia", "informatyka", "fizyka") AND class = "Ib";
+	DELETE FROM subjects WHERE name IN ("fizyka", "informatyka", "geografia", "historia") AND class = "Ic";
+
+BEGIN
+	DECLARE classCursor CURSOR FOR SELECT * FROM tempTable1;
+	DECLARE classIdCursor CURSOR FOR SELECT * FROM tempTable2;
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET @done = 1;
+
+	OPEN classCursor;
+		read_loop1: LOOP
+			BEGIN
+				FETCH classCursor INTO classTemp1;
+				IF (@done = 1) THEN
+  					LEAVE read_loop1;
+				END IF;
+
+				OPEN classIdCursor;
+					read_loop2: LOOP
+						BEGIN
+							FETCH classIdCursor INTO classTemp3;
+							IF (@done = 1) THEN
+  								LEAVE read_loop2;
+							END IF;
+							UPDATE students SET class = CONCAT(@classTemp2, classTemp3) WHERE NOT EXISTS (SELECT * FROM gradesTemptable WHERE id_student = pesel) AND class = (CONCAT(classTemp1, classTemp3));
+							SET @idEdu = (SELECT id_educator FROM classes WHERE name = CONCAT(classTemp1, classTemp3));
+							UPDATE classes SET id_educator = @idEdu WHERE name = CONCAT(@classTemp2, classTemp3);
+							UPDATE subjects SET class = CONCAT(@classTemp2, classTemp3) WHERE class = CONCAT(classTemp1, classTemp3);
+						END;					
+					END LOOP;
+				CLOSE classIdCursor;
+				SET @done = 0;
+				SET @classTemp2 = classTemp1;
+            END;
+		END LOOP;
+	CLOSE classCursor;
+END;
+END;
